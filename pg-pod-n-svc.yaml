@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres
+  name: acme-postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app: acme-postgres
   template:
     metadata:
       labels:
-        app: postgres
+        app: acme-postgres
     spec:
       containers:
-        - name: postgres
+        - name: acme-postgres
           image: postgres:latest
           ports:
             - containerPort: 5432
@@ -37,7 +37,7 @@ metadata:
   name: postgres-service
 spec:
   selector:
-    app: postgres
+    app: acme-postgres
   ports:
     - protocol: TCP
       port: 5432

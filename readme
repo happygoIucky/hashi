@@ -26,3 +26,5 @@ sudo apt-get install google-cloud-sdk-gke-gcloud-auth-plugin
 gcloud container clusters get-credentials jl-gke-sg --zone=asia-southeast1-a
 # Test the kubectl
 kubectl get nodes
+# Deploy PG Pod and SVC
+kubectl apply -f https://raw.githubusercontent.com/happygoIucky/hashi/main/pg-pod-n-svc.yaml
