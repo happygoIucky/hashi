@@ -61,7 +61,7 @@ JUMPHOST_IP=$(gcloud compute instances describe jawn-jumphost \
     --zone=asia-southeast1-a \
     --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
 
-# Check if the GKE cluster exists
+# Check if the GKE cluster existsz
 if ! gcloud container clusters describe jl-gke-sg --zone=asia-southeast1-a &>/dev/null; then
   gcloud container clusters create jl-gke-sg \
       --enable-ip-alias \
