@@ -1,0 +1,53 @@
+name: GKE Deployment with Bash Script
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-gke:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: 'latest'
+        project_id: "ljawn-se-lab"
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCLOUD_SERVICE_KEY }}
+
+    - name: Install gke-gcloud-auth-plugin
+      run: |
+        echo "Installing gke-gcloud-auth-plugin"
+        gcloud components install gke-gcloud-auth-plugin --quiet
+
+    - name: Export use_gke_gcloud_auth_plugin
+      run: |
+        echo "Setting up authentication plugin for kubectl"
+        echo "export USE_GKE_GCLOUD_AUTH_PLUGIN=True" >> $GITHUB_ENV
+
+    - name: Run GKE creation script
+      run: bash gke-bash.sh
+
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials $CLUSTER_NAME --zone $ZONE --project $PROJECT_ID
+      env:
+        PROJECT_ID: "ljawn-se-lab"
+        CLUSTER_NAME: "jl-gke-sg"
+        ZONE: "asia-southeast1-a" # Replace with your chosen zone
+
+    - name: Display kubeconfig
+      run: |
+        echo "Kubeconfig:"
+        cat ~/.kube/config
+        curl https://api.github.com/meta | jq -r '.actions[]'
+    

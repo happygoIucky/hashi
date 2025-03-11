@@ -1,0 +1,29 @@
+name: GKE Destroy with Bash Script
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  destroy-gke:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: 'latest'
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCLOUD_SERVICE_KEY }}
+
+    - name: Run GKE destroy script
+      run: bash gke-bash-destroy.sh
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GCLOUD_SERVICE_KEY }}

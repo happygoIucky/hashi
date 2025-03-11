@@ -1,0 +1,28 @@
+*GCP*
+*For Bash, the order of creation and deletion is IMPORTANT ! 
+# Authenticate using GCLOUD_SERVICE_KEY.
+ a) Create a new Service Account and grant the permissions
+   -Service Account User
+   -Kubernetes Engine Admin
+   -Compute Network Admin
+   -Viewer
+
+# After create SA from GCP Console and downloaded the json, convert to base64 and upload to git secrets or hashivault
+cat sa.json | base64
+After that, you can start to deploy the gke-bash.sh
+
+# --------------THIS SESSION FOR JUMPHOST IN GCP, so only JUMPHOST can manage GKE----------------
+# Create key pair from your laptop and upload to GCP if u have not done so (this is for access jumphost later)
+ssh-keygen -t rsa -b 2048 -f ~/.ssh/jl-hashi
+Copy pub key to GCP SSH Keys under Metadata
+SSH to jump host (username will be your laptop login, can be seen in the pub key last row)
+# Install kubectl and GCP AUth Plugin to auth to GKE
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+gcloud components update
+sudo apt-get install google-cloud-sdk-gke-gcloud-auth-plugin
+# Add k8s config to local jumphost
+gcloud container clusters get-credentials jl-gke-sg --zone=asia-southeast1-a
+# Test the kubectl
+kubectl get nodes
