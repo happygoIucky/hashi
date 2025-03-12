@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acme-vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: acme-vault
+  template:
+    metadata:
+      labels:
+        app: acme-vault
+    spec:
+      containers:
+        - name: ubuntu
+          image: ubuntu:latest
+          command: ["/bin/bash", "-c", "sleep infinity"]  # Keeps the container running
+          securityContext:
+            privileged: true
+          env:
+            - name: DEBIAN_FRONTEND
+              value: "noninteractive"
+          volumeMounts:
+            - mountPath: /root
+              name: ubuntu-home
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/bash", "-c", "apt-get update && apt-get install -y curl iputils-ping net-tools"]
+      volumes:
+        - name: ubuntu-home
+          emptyDir: {}
