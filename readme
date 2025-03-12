@@ -38,5 +38,8 @@ kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].
 
 # Deploy a pod just for vault in ubuntu
 kubectl apply -f https://raw.githubusercontent.com/happygoIucky/hashi/main/acme-vault-deploy.yaml
-kubectl exec -it acme-vault-66d7cb64fb-bkj85 -- bash
+
+# access to vault to perform
+- 
+
 
