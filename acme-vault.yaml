@@ -15,7 +15,7 @@ spec:
       containers:
         - name: ubuntu
           image: ubuntu:latest
-          command: ["/bin/bash", "-c", "sleep infinity"]  # Keeps the container running
+          command: ["/bin/bash", "-c", "sleep infinity"]  # Keeps the pod running
           securityContext:
             privileged: true
           env:
@@ -27,7 +27,14 @@ spec:
           lifecycle:
             postStart:
               exec:
-                command: ["/bin/bash", "-c", "apt-get update && apt-get install -y curl iputils-ping net-tools"]
+                command:
+                  - "/bin/bash"
+                  - "-c"
+                  - |
+                    apt-get update && apt-get install -y wget sudo curl lsb-release iputils-ping net-tools gnupg
+                    wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+                    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+                    sudo apt update && sudo apt install -y vault
       volumes:
         - name: ubuntu-home
           emptyDir: {}
