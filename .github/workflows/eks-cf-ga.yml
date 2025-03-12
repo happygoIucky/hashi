@@ -1,4 +1,4 @@
-name: EKS Deployment/Destroy with CloudFormation
+name: EKS Deployment/Destroy with CloudFormationz
 
 on:
   push:
