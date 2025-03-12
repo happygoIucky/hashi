@@ -27,12 +27,12 @@ gcloud container clusters get-credentials jl-gke-sg --zone=asia-southeast1-a
 # Test the kubectl
 kubectl get nodes
 # Deploy PG Pod and SVC
-kubectl apply -f https://raw.githubusercontent.com/happygoIucky/hashi/main/acme-db-deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/happygolucky/hashi/main/acme-db-deploy.yaml
 # Create role and grant permission
 kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- \
-  psql -U jawn-dba -c "CREATE ROLE \"ro\" NOINHERIT;"
+  psql -U jawn-dba -c "CREATE ROLE \"jawn-dba-role\" NOINHERIT;"
 kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- \
-  psql -U jawn-dba -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"admin-role\";"
+  psql -U jawn-dba -c "GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"jawn-dba-role\";"
 # check the existing roles
 kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- psql -U jawn-dba -c "\du"
 
@@ -40,6 +40,50 @@ kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].
 kubectl apply -f https://raw.githubusercontent.com/happygoIucky/hashi/main/acme-vault-deploy.yaml
 
 # access to vault to perform
-- 
+- Once bash into vault pod
+- Export env variable (ensure to use your value)
+    $ export VAULT_ADDR='https://10.224.0.9:8200'
+    $ export VAULT_CACERT='/tmp/vault-tls1221097004/vault-ca.pem'
+    $ export POSTGRES_URL=10.224.0.7:5432
+
+# ensure your acme-vault-policy.hcl is already existed (should exist since we have already init it in deployment)
+- Apply the vault policy. "vault policy write admin acme-vault-policy.hcl"
+- Check the policy "vault policy list" , "vault policy read admin"
+
+#Configure the database secrets engine
+
+vault secrets enable database
+vault write database/config/postgres \
+     plugin_name=postgresql-database-plugin \
+     connection_url="postgresql://{{username}}:{{password}}@$POSTGRES_URL/postgres?sslmode=disable" \
+     allowed_roles=readonly \
+     username="jawn-dba" \
+     password="P@ssw0rd123$"
+
+# crete a role
+# Ensure your acme-readonly.sql is already existed (should exist since we have already init it in deployment)
+vault write database/roles/readonly \
+      db_name=postgres \
+      creation_statements=@acme-readonly.sql \
+      default_ttl=1h \
+      max_ttl=24h
+
+
+#list all the users
+kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- \
+  psql -U jawn-dba -c "\du"
+
+# Connect to the PostgreSQL database and list all database users with expiry of token
+kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- psql -U jawn-dba -c "SET TIME ZONE 'Asia/Singapore'; SELECT usename, valuntil FROM pg_user;"
+
+# now test the db user with the token to see if its validate. if its expired, you will receive error
+kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- \
+  psql -U v-token-readonly-Z6vZNs9bJWqJst0TsyOU-1741760712 -d postgres -W
+
+
+
+
+
+
 
 
