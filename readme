@@ -42,9 +42,9 @@ kubectl apply -f https://raw.githubusercontent.com/happygoIucky/hashi/main/acme-
 # access to vault to perform
 - Once bash into vault pod
 - Export env variable (ensure to use your value)
-    $ export VAULT_ADDR='https://10.224.0.9:8200'
-    $ export VAULT_CACERT='/tmp/vault-tls1221097004/vault-ca.pem'
-    $ export POSTGRES_URL=10.224.0.7:5432
+    export VAULT_ADDR='http://10.224.0.9:8200'
+    export POSTGRES_URL=10.224.0.7:5432
+    export VAULT_CACERT='/tmp/vault-tls1221097004/vault-ca.pem'
 
 # ensure your acme-vault-policy.hcl is already existed (should exist since we have already init it in deployment)
 - Apply the vault policy. "vault policy write admin acme-vault-policy.hcl"
@@ -78,7 +78,7 @@ kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].
 
 # now test the db user with the token to see if its validate. if its expired, you will receive error
 kubectl exec -it $(kubectl get pod -l app=acme-postgres -o jsonpath="{.items[0].metadata.name}") -- \
-  psql -U v-token-readonly-Z6vZNs9bJWqJst0TsyOU-1741760712 -d postgres -W
+  psql -U v-token-readonly-kvajD3PPvSkHQG5odCWb-1741768312 -d postgres -W
 
 
 

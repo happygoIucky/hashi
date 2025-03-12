@@ -1,0 +1,132 @@
+name: EKS Deployment/Destroy with CloudFormation
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up AWS CLI
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+    - name: Check if stack exists
+      id: stack-check
+      run: |
+        aws cloudformation describe-stacks --stack-name jl-eks-sg-stack-1 || echo "Stack does not exist"
+      continue-on-error: true
+
+    - name: Deploy or update CloudFormation stack
+      id: deploy-update
+      run: |
+        if aws cloudformation describe-stacks --stack-name jl-eks-sg-stack-1; then
+          echo "Stack exists, updating..."
+          aws cloudformation update-stack \
+            --template-body file://eks-cf.yaml \
+            --stack-name jl-eks-sg-stack-1 \
+            --parameters ParameterKey=ClusterName,ParameterValue=jl-eks-sg \
+                         ParameterKey=NodeGroupName,ParameterValue=jl-eks-sg-node-group \
+                         ParameterKey=NodeInstanceType,ParameterValue=t3.medium \
+                         ParameterKey=NodeMinSize,ParameterValue=2 \
+                         ParameterKey=NodeMaxSize,ParameterValue=4 \
+                         ParameterKey=NodeDesiredSize,ParameterValue=2\
+                         ParameterKey=KeyName,ParameterValue=jlsmekey \
+            --capabilities CAPABILITY_NAMED_IAM || echo "No updates are to be performed."
+        else
+          echo "Stack does not exist, creating..."
+          aws cloudformation create-stack \
+            --template-body file://eks-cf.yaml \
+            --stack-name jl-eks-sg-stack-1 \
+            --parameters ParameterKey=ClusterName,ParameterValue=jl-eks-sg \
+                         ParameterKey=NodeGroupName,ParameterValue=jl-eks-sg-node-group \
+                         ParameterKey=NodeInstanceType,ParameterValue=t3.medium \
+                         ParameterKey=NodeMinSize,ParameterValue=2 \
+                         ParameterKey=NodeMaxSize,ParameterValue=4 \
+                         ParameterKey=NodeDesiredSize,ParameterValue=2 \
+                         ParameterKey=KeyName,ParameterValue=jlsmekey \
+            --capabilities CAPABILITY_NAMED_IAM
+        fi
+
+    - name: Wait for stack operation to complete
+      run: |
+        aws cloudformation wait stack-create-complete --stack-name jl-eks-sg-stack-1 || \
+        aws cloudformation wait stack-update-complete --stack-name jl-eks-sg-stack-1
+
+    - name: Output CloudFormation stack outputs
+      run: |
+        aws cloudformation describe-stacks \
+          --stack-name jl-eks-sg-stack-1 \
+          --query "Stacks[0].Outputs"
+
+    - name: Install kubectl
+      run: |
+        if ! command -v kubectl &> /dev/null; then
+          echo "kubectl not found, installing..."
+          curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+        else
+          echo "kubectl already installed"
+        fi
+        
+    - name: Install aws-iam-authenticator
+      run: |
+        if ! command -v aws-iam-authenticator &> /dev/null; then
+          echo "aws-iam-authenticator not found, installing..."
+          curl -o aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws.com/1.18.9/2021-01-05/bin/linux/amd64/aws-iam-authenticator
+          chmod +x ./aws-iam-authenticator
+          sudo mv ./aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
+        else
+          echo "aws-iam-authenticator already installed"
+        fi
+
+    - name: Update Kubeconfig for EKS cluster
+      run: |
+        aws eks update-kubeconfig --name jl-eks-sg --region ${{ secrets.AWS_DEFAULT_REGION }}
+
+    - name: Verify Kubernetes Login
+      run: |
+        kubectl get svc
+
+      # RBAC to grant users permission to access Kubernetes such as POD can access K8S API resources z
+    - name: Apply RBAC configurations
+      run: |
+        kubectl apply -f eks-rbac.yaml
+
+#    - name: Grafana Deployment
+#      env:
+#        GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
+#      run: |
+#        if [ -f grafana-deploy.sh ]; then
+#          chmod +x eks-grafana-deploy.sh
+#          bash eks-grafana-deploy.sh "${GRAFANA_TOKEN}"
+#        else
+#          echo "eks-grafana-deploy.sh not found"
+#        fi
+
+    #- name: Grafana Destroy
+    #  run: |
+    #    helm uninstall grafana-k8s-monitoring --namespace "default"
+
+     #Delete CloudFormation stack
+     #Deletion will take awhile despite GitAction completion. Please wait at least 15mins before proceeding
+    #- name: Delete EKS (Cleanup)
+     # run: |
+      #  aws cloudformation delete-stack --stack-name jl-eks-sg-stack-1
+
+    #- name: Apply Jumphost
+    #  run: |
+    #    kubectl apply -f ubuntu-jumphost.yaml  
+    #    kubectl get pods 
+    #    POD_NAME=$(kubectl get pods -l app=ubuntu -o jsonpath="{.items[0].metadata.name}")
+    #    kubectl exec -it $POD_NAME -- /bin/-namespace -f grafana.yaml
