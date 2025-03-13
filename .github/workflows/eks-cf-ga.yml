@@ -29,7 +29,7 @@ jobs:
     - name: Deploy or update CloudFormation stack
       id: deploy-update
       run: |
-        if aws cloudformation describe-stacks --stack-name jl-eks-stack-4; then
+        if aws cloudformation describe-stacks --stack-name jl-eks-stack-4 then
           echo "Stack exists, updating..."
           aws cloudformation update-stack \
             --template-body file://eks-cf.yaml \
@@ -46,7 +46,7 @@ jobs:
           echo "Stack does not exist, creating..."
           aws cloudformation create-stack \
             --template-body file://eks-cf.yaml \
-            --stack-name `4 \
+            --stack-name jl-eks-stack-4 \
             --parameters ParameterKey=ClusterName,ParameterValue=jl-eks-sg \
                          ParameterKey=NodeGroupName,ParameterValue=jl-eks-sg-node-group \
                          ParameterKey=NodeInstanceType,ParameterValue=t3.medium \
