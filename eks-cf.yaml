@@ -1,292 +1,177 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: AWS EKS Cluster with VPC, Subnets, Security Group, and Node Group, bastion
+Description: "AWS EKS Cluster with VPC, Node Groups, Security Groups, and EBS CSI Driver"
 
 Parameters:
   ClusterName:
     Type: String
-    Description: The name of the EKS cluster
+    Default: "my-eks-cluster"
+    Description: "The name of the EKS cluster"
 
-  NodeGroupName:
+  ClusterVersion:
     Type: String
-    Default: nodegroup
-    Description: The name of the node group
+    Default: "1.25"
+    Description: "EKS Cluster Version"
 
   NodeInstanceType:
     Type: String
-    Default: t3.medium
-    Description: EC2 instance type for the node group
+    Default: "t3a.medium"
+    Description: "EC2 instance type for worker nodes"
 
   NodeMinSize:
     Type: Number
     Default: 1
-    Description: Minimum size of the node group
+    Description: "Minimum number of worker nodes"
 
   NodeMaxSize:
     Type: Number
-    Default: 3
-    Description: Maximum size of the node group
+    Default: 5
+    Description: "Maximum number of worker nodes"
 
   NodeDesiredSize:
     Type: Number
-    Default: 1
-    Description: Desired size of the node group
-  
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Default: 2
+    Description: "Desired number of worker nodes"
 
 Resources:
+
+  # ---- VPC ----
   VPC:
-    Type: 'AWS::EC2::VPC'
+    Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: '10.0.0.0/16'
+      CidrBlock: "10.0.0.0/16"
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub ${ClusterName}-vpc
+          Value: !Ref ClusterName
 
+  # ---- Public Subnets ----
   PublicSubnet1:
-    Type: 'AWS::EC2::Subnet'
+    Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: '10.0.1.0/24'
+      CidrBlock: "10.0.4.0/24"
       AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-public-subnet-1
 
   PublicSubnet2:
-    Type: 'AWS::EC2::Subnet'
+    Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: '10.0.2.0/24'
+      CidrBlock: "10.0.5.0/24"
       AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-public-subnet-2
 
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.6.0/24"
+      AvailabilityZone: !Select [2, !GetAZs '']
+      MapPublicIpOnLaunch: true
+
+  # ---- Private Subnets ----
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: '10.0.3.0/24'
+      CidrBlock: "10.0.1.0/24"
       AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-private-subnet-1
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: '10.0.4.0/24'
+      CidrBlock: "10.0.2.0/24"
       AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-private-subnet-2
 
-  InternetGateway:
-    Type: 'AWS::EC2::InternetGateway'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-igw
-
-  AttachGateway:
-    Type: 'AWS::EC2::VPCGatewayAttachment'
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
+      CidrBlock: "10.0.3.0/24"
+      AvailabilityZone: !Select [2, !GetAZs '']
+      MapPublicIpOnLaunch: false
 
-  NatGateway1:
-    Type: 'AWS::EC2::NatGateway'
+  # ---- EKS Security Group ----
+  EKSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      AllocationId: !GetAtt EIPForNAT1.AllocationId
-      SubnetId: !Ref PublicSubnet1
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-nat-gateway-1
-
-  EIPForNAT1:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-eip-for-nat-1
-
-  NatGateway2:
-    Type: 'AWS::EC2::NatGateway'
-    Properties:
-      AllocationId: !GetAtt EIPForNAT2.AllocationId
-      SubnetId: !Ref PublicSubnet2
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-nat-gateway-2
-
-  EIPForNAT2:
-    Type: 'AWS::EC2::EIP'
-    Properties:
-      Domain: vpc
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-eip-for-nat-2
-
-  PublicRouteTable:
-    Type: 'AWS::EC2::RouteTable'
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-rtb
-
-  PrivateRouteTable1:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-private-rtb-1
-
-  PrivateRouteTable2:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-private-rtb-2
-
-  PublicRoute:
-    Type: 'AWS::EC2::Route'
-    DependsOn: AttachGateway
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: '0.0.0.0/0'
-      GatewayId: !Ref InternetGateway
-
-  PrivateRoute1:
-    Type: 'AWS::EC2::Route'
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable1
-      DestinationCidrBlock: '0.0.0.0/0'
-      NatGatewayId: !Ref NatGateway1
-
-  PrivateRoute2:
-    Type: 'AWS::EC2::Route'
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: '0.0.0.0/0'
-      NatGatewayId: !Ref NatGateway2
-
-
-  PublicSubnetRouteTableAssociation1:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Properties:
-      SubnetId: !Ref PublicSubnet1
-      RouteTableId: !Ref PublicRouteTable
-
-  PublicSubnetRouteTableAssociation2:
-    Type: 'AWS::EC2::SubnetRouteTableAssociation'
-    Properties:
-      SubnetId: !Ref PublicSubnet2
-      RouteTableId: !Ref PublicRouteTable
-
-  PrivateSubnetRouteTableAssociation1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnet1
-      RouteTableId: !Ref PrivateRouteTable1
-
-  PrivateSubnetRouteTableAssociation2:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnet2
-      RouteTableId: !Ref PrivateRouteTable2
-
-  EKSClusterSecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: EKS Cluster communication with worker nodes from Bastion host
+      GroupDescription: "EKS Cluster Security Group"
       VpcId: !Ref VPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          #SourceSecurityGroupId: !Ref BastionSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-sg
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: "0.0.0.0/0"
 
+  # ---- IAM Role for EKS ----
   EKSClusterRole:
-    Type: 'AWS::IAM::Role'
+    Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
-          - Effect: 'Allow'
+          - Effect: Allow
             Principal:
-              Service: 'eks.amazonaws.com'
-            Action: 'sts:AssumeRole'
-      Path: '/'
+              Service: "eks.amazonaws.com"
+            Action: "sts:AssumeRole"
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonEKSClusterPolicy'
-        - 'arn:aws:iam::aws:policy/AmazonEKSServicePolicy'
+        - "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+        - "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
 
-  EKSNodeInstanceRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: 'Allow'
-            Principal:
-              Service: 'ec2.amazonaws.com'
-            Action: 'sts:AssumeRole'
-      Path: '/'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy'
-        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
-        - 'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy'
-
+  # ---- EKS Cluster ----
   EKSCluster:
-    Type: 'AWS::EKS::Cluster'
+    Type: AWS::EKS::Cluster
     Properties:
-      Name: !Sub ${ClusterName}
+      Name: !Ref ClusterName
+      Version: !Ref ClusterVersion
       RoleArn: !GetAtt EKSClusterRole.Arn
       ResourcesVpcConfig:
         SubnetIds:
-          #- !Ref PublicSubnet1
-          #- !Ref PublicSubnet2
           - !Ref PrivateSubnet1
           - !Ref PrivateSubnet2
+          - !Ref PrivateSubnet3
         SecurityGroupIds:
-          - !Ref EKSClusterSecurityGroup
+          - !Ref EKSSecurityGroup
 
-  EKSNodeGroup:
-    Type: 'AWS::EKS::Nodegroup'
+  # ---- IAM Role for Node Group ----
+  NodeInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "ec2.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        - "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+
+  # ---- EKS Managed Node Group ----
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
     Properties:
       ClusterName: !Ref EKSCluster
-      NodegroupName: !Ref NodeGroupName
-      NodeRole: !GetAtt EKSNodeInstanceRole.Arn
-      Subnets:
-        #- !Ref PublicSubnet1
-        #- !Ref PublicSubnet2
-        - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
+      NodegroupName: "consul"
+      NodeRole: !GetAtt NodeInstanceRole.Arn
       ScalingConfig:
         MinSize: !Ref NodeMinSize
         MaxSize: !Ref NodeMaxSize
         DesiredSize: !Ref NodeDesiredSize
+      Subnets:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
       InstanceTypes:
         - !Ref NodeInstanceType
-      RemoteAccess:
-        Ec2SshKey: jlsmekey
 
+  # ---- IAM Role for EBS CSI ----
   EBSCSIRole:
     Type: AWS::IAM::Role
     Properties:
@@ -297,88 +182,45 @@ Resources:
             Principal:
               Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/oidc.eks.${AWS::Region}.amazonaws.com/id/${EKSCluster}"
             Action: "sts:AssumeRoleWithWebIdentity"
-            Condition:
-              StringEquals:
-                "oidc.eks.${AWS::Region}.amazonaws.com/id/${EKSCluster}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
       Tags:
         - Key: Name
           Value: "AmazonEKSTFEBSCSIRole"
-          
+
+  # ---- EBS CSI Add-on ----
   EBSCSIAddon:
     Type: AWS::EKS::Addon
     Properties:
       ClusterName: !Ref EKSCluster
       AddonName: "aws-ebs-csi-driver"
-      AddonVersion: "v1.20.0-eksbuild.1"
       ServiceAccountRoleArn: !GetAtt EBSCSIRole.Arn
-
-  BastionSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow SSH access to the bastion host
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-bastion-sg
-
-  BastionHost:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      KeyName: !Ref KeyName
-      #KeyName: !Ref BastionKeyName
-      #SecurityGroupIds:
-        #- !Ref BastionSecurityGroup
-      #SubnetId: !Ref PublicSubnet1
-      ImageId: ami-0fe5e4fe8e0b4152c
-      Tags:
-        - Key: Name
-          Value: !Sub ${ClusterName}-bastion-host
-      NetworkInterfaces:
-        - AssociatePublicIpAddress: true
-          DeviceIndex: 0
-          SubnetId: !Ref PublicSubnet1
-          GroupSet:
-            - !Ref BastionSecurityGroup
-          DeleteOnTermination: true
 
 Outputs:
   ClusterName:
-    Description: The name of the EKS cluster
+    Description: "EKS Cluster Name"
     Value: !Ref EKSCluster
+
   ClusterEndpoint:
-    Description: The endpoint for the EKS cluster
+    Description: "EKS Cluster API Endpoint"
     Value: !GetAtt EKSCluster.Endpoint
-  ClusterArn:
-    Description: The ARN of the EKS cluster
-    Value: !GetAtt EKSCluster.Arn
+
   ClusterRoleArn:
-    Description: The ARN of the IAM role for the EKS cluster
+    Description: "IAM Role for EKS Cluster"
     Value: !GetAtt EKSClusterRole.Arn
+
+  NodeRoleArn:
+    Description: "IAM Role for Worker Nodes"
+    Value: !GetAtt NodeInstanceRole.Arn
+
   VPCId:
-    Description: The ID of the VPC
+    Description: "VPC ID"
     Value: !Ref VPC
-  PublicSubnet1Id:
-    Description: The ID of the first public subnet
-    Value: !Ref PublicSubnet1
-  PublicSubnet2Id:
-    Description: The ID of the second public subnet
-    Value: !Ref PublicSubnet2
-  PrivateSubnet1Id:
-    Description: The ID of the first public subnet
-    Value: !Ref PrivateSubnet1
-  PrivateSubnet2Id:
-    Description: The ID of the second public subnet
-    Value: !Ref PrivateSubnet2
-  SecurityGroupId:
-    Description: The ID of thze security group for the EKS cluster
-    Value: !Ref EKSClusterSecurityGroup
 
+  PublicSubnets:
+    Description: "Public Subnet IDs"
+    Value: !Join [",", [!Ref PublicSubnet1, !Ref PublicSubnet2, !Ref PublicSubnet3]]
 
+  PrivateSubnets:
+    Description: "Private Subnet IDs"
+    Value: !Join [",", [!Ref PrivateSubnet1, !Ref PrivateSubnet2, !Ref PrivateSubnet3]]
