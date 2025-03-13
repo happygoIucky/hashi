@@ -291,15 +291,15 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/oidc.eks.${AWS::Region}.amazonaws.com/id/${EKSCluster}"
-            Action: sts:AssumeRoleWithWebIdentity
+            Action: "sts:AssumeRoleWithWebIdentity"
             Condition:
               StringEquals:
-                eks.amazonaws.com/role-arn: !GetAtt EKSCluster.Arn
+                "oidc.eks.${AWS::Region}.amazonaws.com/id/${EKSCluster}:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
       Tags:
