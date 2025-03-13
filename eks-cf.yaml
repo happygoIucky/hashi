@@ -133,7 +133,7 @@ Resources:
         - 'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy'
         - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
         - 'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy'
-        - 'arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy'  # ✅ Added for EBS CSI driver
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy'
 
   EKSCluster:
     Type: 'AWS::EKS::Cluster'
@@ -165,7 +165,6 @@ Resources:
       RemoteAccess:
         Ec2SshKey: !Ref KeyName
 
-  # ✅ Deploying the EBS CSI Driver Add-On
   EBSCSIDriverAddon:
     Type: AWS::EKS::Addon
     Properties:
