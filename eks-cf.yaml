@@ -287,6 +287,33 @@ Resources:
       RemoteAccess:
         Ec2SshKey: jlsmekey
 
+  EBSCSIRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !GetAtt OIDCProvider.Arn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                eks.amazonaws.com/role-arn: !GetAtt EKSCluster.Arn
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+      Tags:
+        - Key: Name
+          Value: "AmazonEKSTFEBSCSIRole"
+          
+  EBSCSIAddon:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref EKSCluster
+      AddonName: "aws-ebs-csi-driver"
+      AddonVersion: "v1.20.0-eksbuild.1"
+      ServiceAccountRoleArn: !GetAtt EBSCSIRole.Arn
+      
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -354,29 +381,4 @@ Outputs:
     Description: The ID of thze security group for the EKS cluster
     Value: !Ref EKSClusterSecurityGroup
 
-  EBSCSIRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Federated: !GetAtt OIDCProvider.Arn
-            Action: sts:AssumeRoleWithWebIdentity
-            Condition:
-              StringEquals:
-                eks.amazonaws.com/role-arn: !GetAtt EKSCluster.Arn
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-      Tags:
-        - Key: Name
-          Value: "AmazonEKSTFEBSCSIRole"
-          
-  EBSCSIAddon:
-    Type: AWS::EKS::Addon
-    Properties:
-      ClusterName: !Ref EKSCluster
-      AddonName: "aws-ebs-csi-driver"
-      AddonVersion: "v1.20.0-eksbuild.1"
-      ServiceAccountRoleArn: !GetAtt EBSCSIRole.Arn
+
