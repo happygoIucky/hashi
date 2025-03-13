@@ -23,17 +23,17 @@ jobs:
     - name: Check if stack exists
       id: stack-check
       run: |
-        aws cloudformation describe-stacks --stack-name jl-eks-sg-stack || echo "Stack does not exist"
+        aws cloudformation describe-stacks --stack-name jl-eks-stack || echo "Stack does not exist"
       continue-on-error: true
 
     - name: Deploy or update CloudFormation stack
       id: deploy-update
       run: |
-        if aws cloudformation describe-stacks --stack-name jl-eks-sg-stack; then
+        if aws cloudformation describe-stacks --stack-name jl-eks-stack; then
           echo "Stack exists, updating..."
           aws cloudformation update-stack \
             --template-body file://eks-cf.yaml \
-            --stack-name jl-eks-sg-stack \
+            --stack-name jl-eks-stack \
             --parameters ParameterKey=ClusterName,ParameterValue=jl-eks-sg \
                          ParameterKey=NodeGroupName,ParameterValue=jl-eks-sg-node-group \
                          ParameterKey=NodeInstanceType,ParameterValue=t3.medium \
@@ -46,7 +46,7 @@ jobs:
           echo "Stack does not exist, creating..."
           aws cloudformation create-stack \
             --template-body file://eks-cf.yaml \
-            --stack-name jl-eks-sg-stack \
+            --stack-name jl-eks-stack \
             --parameters ParameterKey=ClusterName,ParameterValue=jl-eks-sg \
                          ParameterKey=NodeGroupName,ParameterValue=jl-eks-sg-node-group \
                          ParameterKey=NodeInstanceType,ParameterValue=t3.medium \
@@ -59,13 +59,13 @@ jobs:
 
     - name: Wait for stack operation to complete
       run: |
-        aws cloudformation wait stack-create-complete --stack-name jl-eks-sg-stack || \
-        aws cloudformation wait stack-update-complete --stack-name jl-eks-sg-stack
+        aws cloudformation wait stack-create-complete --stack-name jl-eks-stack || \
+        aws cloudformation wait stack-update-complete --stack-name jl-eks-stack
 
     - name: Output CloudFormation stack outputs
       run: |
         aws cloudformation describe-stacks \
-          --stack-name jl-eks-sg-stack \
+          --stack-name jl-eks-stack \
           --query "Stacks[0].Outputs"
 
     - name: Install kubectl
@@ -122,7 +122,7 @@ jobs:
      #Deletion will take awhile despite GitAction completion. Please wait at least 15mins before proceeding
     #- name: Delete EKS (Cleanup)
      # run: |
-      #  aws cloudformation delete-stack --stack-name jl-eks-sg-stack
+      #  aws cloudformation delete-stack --stack-name jl-eks-stack
 
     #- name: Apply Jumphost
     #  run: |
