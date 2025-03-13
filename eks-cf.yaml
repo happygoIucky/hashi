@@ -295,7 +295,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !GetAtt OIDCProvider.Arn
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/oidc.eks.${AWS::Region}.amazonaws.com/id/${EKSCluster}"
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
@@ -313,7 +313,7 @@ Resources:
       AddonName: "aws-ebs-csi-driver"
       AddonVersion: "v1.20.0-eksbuild.1"
       ServiceAccountRoleArn: !GetAtt EBSCSIRole.Arn
-      
+
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
